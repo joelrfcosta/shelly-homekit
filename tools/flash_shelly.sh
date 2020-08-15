@@ -30,7 +30,20 @@
 #  usage: ./flash_shelly.sh -u shelly1-034FFF.local
 
 
-function install_brew {
+function check_brew {
+  if [ "$(which brew 2>/dev/null)" != "" ]; then
+    return 0
+  fi
+
+  while true; do
+    read -p "brew is not installed, would you like to install it ?" yn
+    case $yn in
+        [Yy]* ) install_brew; break;;
+        [Nn]* ) echo "brew is required for this script to fuction. now exiting..."; exit 1;;
+        * ) echo "Please answer yes or no.";;
+    esac
+  done
+
   echo -e '\033[1mInstalling brew...\033[0m'
   echo -e '\033[1mPlease follow instructions...\033[0m'
   echo -e '\033[1mYou will be asked for your password to install breww...\033[0m'
@@ -38,23 +51,14 @@ function install_brew {
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 }
 
-if [ "$(which brew 2>/dev/null)" == "" ]; then
-  while true; do
-    read -p "brew is not installed, would you like to install it ?" yn
-    case $yn in
-        [Yy]* ) install_brew; break;;
-        [Nn]* ) echo "brew is required for this script to fuction. now exiting..."; exit;;
-        * ) echo "Please answer yes or no.";;
-    esac
-  done
-fi
-
 if [ "$(which timeout 2>/dev/null)" == "" ]; then
+  check_brew
   echo -e '\033[1mInstalling coreutils...\033[0m'
   brew install coreutils
 fi
 
 if [ "$(which jq  2>/dev/null)" == "" ]; then
+  check_brew
   echo -e '\033[1mInstalling jq...\033[0m'
   brew install jq
 fi
@@ -120,7 +124,7 @@ function probe_info {
       read -p "Press enter to continue"
       continue
     else
-      exit
+      exit 1
     fi
   fi
   if [[ $info == "Not Found" ]]; then
@@ -242,30 +246,44 @@ function device_scan {
 
 function help {
   echo "Shelly HomeKit flashing script utility"
-  echo "Usage: $1 {-c|-u} $2{hostname optional}"
-  echo " -c, --check-only    Only check for updates."
-  echo " -u, --update        Update device(s) to the lastest available firmware."
-  echo " -h, --help          This help text"
+  echo "Usage: $0 TODO"
+  # TODO
 }
 
-case $1 in
-  -h|--help)
-    help; exit;;
-  -c|--check-only)
-    scriptmode="check-only";;
-  -u|--update)
-    scriptmode="update";;
-  *)
-    if [ -n "$1" ]; then
-        echo "flash_shelly: option $1: is unknown"
-    fi
-    echo "flash_shelly: try flash_shelly --help"
-    exit;;
-esac
+action=flash
+do_all=false
+dry_run=false
 
-release_info=$(curl -qsS -m 5 https://api.github.com/repos/mongoose-os-apps/shelly-homekit/releases/latest)
-if [ -n "$2" ]; then
-  device_scan $scriptmode $2
-else
-  device_scan $scriptmode null
+while getopts ":ahl" opt; do
+  case ${opt} in
+    a )
+      do_all=true
+      ;;
+    h )
+      help
+      exit 0
+      ;;
+    l )
+      action=list
+      ;;
+    n )
+      dry_run=true
+      ;;
+    \? )
+      echo "Invalid option"
+      help
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+echo "action=$action do_all=$do_all dry_run=$dry_run"
+echo "args: $@"
+
+if [ $# == 0 -a "$do_all" != true ]; then
+  help
+  exit 1
 fi
+
+# TODO: the rest of it
